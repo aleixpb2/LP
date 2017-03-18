@@ -1,0 +1,5 @@
+/opt/pccts/bin/antlr -gt plumber.g
+/opt/pccts/bin/dlg -ci parser.dlg scan.c
+g++ -o plum plumber.c scan.c err.c -I/home/soft/PCCTS_v1.33/include/ -Wno-write-strings
+
+Windows: antlr -gt plumber.g && dlg -ci parser.dlg scan.c && g++ -o plum plumber.c scan.c err.c -I../PCCTS_v1.33/include/ -Wno-write-strings
