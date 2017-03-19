@@ -45,6 +45,9 @@ map<string, pair<vector<Tube>,int> > tubeVectors; // Key: ID, Value: pair < Tube
 string incorrectVar = "Error. The variable does not exist or it is not of the type expected.";
 string incorrectLenDiam = "Error. Length (of tubes and vectors) and diameter must be postive integers";
 string badSyntax = "Error. Bad syntax";
+string vecFull = "Error. Cannot push: the vector is full";
+string vecEmpty = "Error. Cannot pop: the vector is empty";
+string mergeError = "Error. Cannot merge: Unmatched diameters";
 
 
 // function to fill token information
@@ -126,12 +129,11 @@ void ASTPrint(AST *a)
 /***** AUXILIARY FUNCTIONS ********/
 
 int evalNumExpr(AST *a) {
-    cerr << "evalN" << endl;
     if (a == NULL) return 0;
-    else if(a->kind == "intconst")
+    if(a->kind == "intconst")
         return atoi(a->text.c_str());
 
-    else if(a->kind == "LENGTH" || a->kind == "DIAMETER"){
+    if(a->kind == "LENGTH" || a->kind == "DIAMETER"){
         string var = child(a,0)->text;
         if(m.find(var) != m.end()){ // var exists
             char varT = m[var];
@@ -147,18 +149,42 @@ int evalNumExpr(AST *a) {
             }
         }else cout << incorrectVar << endl; return -1;
     }
-
-    else if(a->kind == "+")
+    if(a->kind == "+")
         return evalNumExpr(child(a,0)) + evalNumExpr(child(a,1));
-
-    else if(a->kind == "-")
+    if(a->kind == "-")
         return evalNumExpr(child(a,0)) - evalNumExpr(child(a,1));
-
-    else if(a->kind == "*")
+    if(a->kind == "*")
         return evalNumExpr(child(a,0)) * evalNumExpr(child(a,1));
-
-    else if(a->kind == "/")
+    if(a->kind == "/")
         return evalNumExpr(child(a,0)) / evalNumExpr(child(a,1));
+}
+
+bool evalBoolExpr(AST* a){
+    if (a == NULL) return true;
+    if(a->kind == "OR")
+        return evalBoolExpr(child(a,0)) || evalBoolExpr(child(a,1));
+    if(a->kind == "AND")
+        return evalBoolExpr(child(a,0)) && evalBoolExpr(child(a,1));
+    if(a->kind == "NOT")
+        return !evalBoolExpr(child(a,0));
+    if(a->kind == "<")
+        return evalNumExpr(child(a,0)) < evalNumExpr(child(a,1));
+    if(a->kind == ">")
+        return evalNumExpr(child(a,0)) > evalNumExpr(child(a,1));
+    if(a->kind == "==")
+        return evalNumExpr(child(a,0)) == evalNumExpr(child(a,1));
+    if(a->kind == "FULL" || a->kind == "EMPTY"){
+        string var = child(a,0)->text;
+        if(m.find(var) == m.end() || (m.find(var) != m.end() && m[var] != 'V')){
+            cout << incorrectVar << endl;
+            return false; // don't iterate
+        }
+        if(a->kind == "FULL"){
+            int maxSize = tubeVectors[var].second;
+            return tubeVectors[var].first.size() == maxSize;
+        }
+        return tubeVectors[var].first.size() == 0; // EMPTY
+    }
 }
 
 void deleteVar(string var){
@@ -179,8 +205,10 @@ void deleteVar(string var){
 }
 
 void printVars(){
+    cout << endl << "=== Variables ===" << endl;
     map<string, char>::iterator it = m.begin();
     while(it != m.end()){
+        cout << it->first << ": \t";
         char t = it->second;
         switch(t){
         case 'T':
@@ -193,15 +221,21 @@ void printVars(){
             cout << "TUBEVECTOR OF " << tubeVectors[it->first].second << ":" << endl;
             int size = tubeVectors[it->first].first.size();
             for(int i = 0; i < size; ++i){
-                cout << "TUBE " << tubeVectors[it->first].first[i].length << " " << tubeVectors[it->first].first[i].diameter << endl;
+                cout << "\t  TUBE " << tubeVectors[it->first].first[i].length << " " << tubeVectors[it->first].first[i].diameter << endl;
             }
         }
         ++it;
     }
 }
 
+Tube merge(AST* mer, bool modify){
+    //TODO
+    AST* lTubeAST = child(mer, 0);
+    AST* conAST = child(mer, 1);
+    AST* rTubeAST = child(mer, 2);
+}
+
 void execute(AST *a){
-    cerr << "execute" << endl;
     if (a == NULL)
         return;
 
@@ -210,13 +244,32 @@ void execute(AST *a){
         cerr << "=" << endl;
         string lvar = child(a,0)->text;
         AST* right = child(a,1);
-
-        if(child(a,0)->kind == "var"){ // lvar is a variable
+        if(child(a,0)->kind != "var")cout << incorrectVar << endl;
+        else{
+            // lvar is a variable now
             deleteVar(lvar); // we delete it if it already exists
             AST* splitAST = child(a, 2);
             if(splitAST != NULL && splitAST->kind == "SPLIT"){ // splitasig
-                // TODO
+                cerr << "SPLIT" << endl;
+                // we check if right is a var and varToSplit is a Tube
                 string varToSplit = child(splitAST, 0)->text;
+                if(right->kind != "var" || child(splitAST, 0)->kind != "var" || m[varToSplit] != 'T')cout << incorrectVar << endl;
+                else{
+                    string rvar = right->text;
+                    deleteVar(rvar);
+                    int len = tubes[varToSplit].length;
+                    int diam= tubes[varToSplit].diameter;
+                    deleteVar(varToSplit);
+                    int len1 = len/2;
+                    int len2 = len-len1;
+                    m[lvar] = 'T';
+                    m[rvar] = 'T';
+                    if(len1 > 0 && len2 > 0 && diam > 0){
+                        tubes[lvar] = Tube(len1, diam);
+                        tubes[rvar] = Tube(len2, diam);
+                    }
+                    else cout << incorrectLenDiam << endl;
+                }
             }else if(right->kind == "TUBE"){
                 cerr << "TUBE" << endl;
                 m[lvar] = 'T';
@@ -231,7 +284,13 @@ void execute(AST *a){
                 if(diam > 0) connectors[lvar] = diam;
                 else cout << incorrectLenDiam << endl;
             }else if(right->kind == "MERGE"){
-                // TODO
+                Tube t = merge(right, false); // modify = false, just a check if it is possible
+                if(t.length > 0){ // merge successful. Change state
+                    Tube t = merge(right, true);
+                    m[lvar] = 'T';
+                    tubes[lvar] = Tube(t.length, t.diameter);
+                }else cout << mergeError << endl;
+
             }else if(right->kind == "TUBEVECTOR"){
                 cerr << "TUBEVECTOR" << endl;
                 m[lvar] = 'V';
@@ -256,9 +315,8 @@ void execute(AST *a){
                 default: // 'V'
                     tubeVectors[lvar] = tubeVectors[rvar];
                 }
-            }
-            else cout << badSyntax << endl;
-        }else cout << incorrectVar << endl;
+            }else cout << badSyntax << endl;
+        }
     }
 
     // numfunct
@@ -267,12 +325,44 @@ void execute(AST *a){
         if(res != -1) cout << res << endl;
     }
     // pushpop
-    //
+    else if(a->kind == "PUSH" || a->kind == "POP"){
+        string vecVar = child(a, 0)->text;
+        string tubeVar = child(a, 1)->text;
+        if(m.find(vecVar) == m.end() || (m.find(vecVar) != m.end() && m[vecVar] != 'V')) cout << incorrectVar << endl; // not a vector
+        else{
+            if(a->kind == "PUSH"){
+                if(m.find(tubeVar) == m.end() || (m.find(tubeVar) != m.end() && m[tubeVar] != 'T')) cout << incorrectVar << endl; // not a tube
+                else{
+                    int maxSize = tubeVectors[vecVar].second;
+                    if(tubeVectors[vecVar].first.size() < maxSize){
+                        Tube t = tubes[tubeVar];
+                        tubeVectors[vecVar].first.push_back(t);
+                        deleteVar(tubeVar);
+                    }
+                    else cout << vecFull << endl;
+                }
+            }else{ // POP
+                if(tubeVectors[vecVar].first.size() > 0){
+                    deleteVar(tubeVar);
+                    Tube t = tubeVectors[vecVar].first.back();
+                    tubeVectors[vecVar].first.pop_back();
+                    m[tubeVar] = 'T';
+                    tubes[tubeVar] = t;
+                }else cout << vecEmpty << endl;
+            }
+        }
+    }
     // whilexpr
-    //
-
-
-    else cerr << a->kind << endl;
+    else if(a->kind == "WHILE"){
+        AST* boolexpr = child(a, 0);
+        AST* list = child(a, 1);
+        bool iterate = evalBoolExpr(boolexpr);
+        while(iterate){
+            execute(child(list, 0));
+            iterate = evalBoolExpr(boolexpr);
+        }
+    }
+    else cout << badSyntax << endl;
     execute(a->right);
 }
 /************/
