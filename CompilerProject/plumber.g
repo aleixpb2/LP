@@ -42,7 +42,7 @@ map<string, int> connectors;
 map<string, pair<vector<Tube>,int> > tubeVectors; // Key: ID, Value: pair < TubeVector, maxSize >
 
 // Errors strings
-string incorrectVar = "Error. The variable does not exist or it is not of the type expected.";
+string incorrectVar = "Error. The variable does not exist or it is not of the type expected."; // TODO: use the functions
 string incorrectLenDiam = "Error. Length (of tubes and vectors) and diameter must be postive integers";
 string badSyntax = "Error. Bad syntax";
 string vecFull = "Error. Cannot push: the vector is full";
@@ -228,11 +228,74 @@ void printVars(){
     }
 }
 
+bool existsTube(AST* a){
+    string var = a->text;
+    if(a->kind != "var" || m.find(var) == m.end()){
+        cout << "Variable " << var << " does not exist." << endl;
+        return false;
+    }
+    if(m.find(var) != m.end() && m[var] != 'T'){
+        cout << "Variable " << var << " is not a tube." << endl;
+        return false;
+    }
+    return true;
+}
+
+
+bool existsConnector(AST* a){
+    string var = a->text;
+    if(a->kind != "var" || m.find(var) == m.end()){
+        cout << "Variable " << var << " does not exist." << endl;
+        return false;
+    }
+    if(m.find(var) != m.end() && m[var] != 'C'){
+        cout << "Variable " << var << " is not a connector." << endl;
+        return false;
+    }
+    return true;
+}
+
+
+bool existsTubeVector(AST* a){
+    string var = a->text;
+    if(a->kind != "var" || m.find(var) == m.end()){
+        cout << "Variable " << var << " does not exist." << endl;
+        return false;
+    }
+    if(m.find(var) != m.end() && m[var] != 'V'){
+        cout << "Variable " << var << " is not a tube vector." << endl;
+        return false;
+    }
+    return true;
+}
+
 Tube merge(AST* mer, bool modify){
-    //TODO
     AST* lTubeAST = child(mer, 0);
     AST* conAST = child(mer, 1);
     AST* rTubeAST = child(mer, 2);
+    Tube lTube, rTube;
+    if(!existsConnector(conAST))return Tube(-1, -1);
+    // Connector exists
+    if(lTubeAST->kind == "MERGE") lTube = merge(lTubeAST, modify);
+    else if(!existsTube(lTubeAST)) return Tube(-1, -1);
+    // lTube exists
+    else lTube = tubes[lTubeAST->text];
+
+    if(rTubeAST->kind == "MERGE") rTube = merge(rTubeAST, modify);
+    else if(!existsTube(rTubeAST)) return Tube(-1, -1);
+    // rTube exists
+    else rTube = tubes[rTubeAST->text];
+
+    // Check if we can merge
+    if(lTube.length != -1 && rTube.length != -1 && (lTube.diameter == rTube.diameter == connectors[conAST->text])){
+        if(modify){
+            deleteVar(lTubeAST->text);
+            deleteVar(rTubeAST->text);
+            deleteVar(conAST->text);
+        }
+        return Tube(lTube.length+rTube.length, lTube.diameter);
+    }else return Tube(-1, -1);
+
 }
 
 void execute(AST *a){
